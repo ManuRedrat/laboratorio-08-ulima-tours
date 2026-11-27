@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>pe.edu.ulima.is2</groupId>
+    <artifactId>agencia-viajes</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    <name>Agencia de Viajes - Caso de pruebas y refactoring</name>
+
+    <properties>
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <main.class>pe.edu.ulima.is2.viajes.App</main.class>
+
+        <junit.version>5.11.3</junit.version>
+        <mockito.version>5.20.0</mockito.version>
+
+        <!-- PIT: clases a mutar y pruebas a ejecutar. Se pueden cambiar desde la línea de comandos:
+             mvn test-compile org.pitest:pitest-maven:mutationCoverage -Dpit.clases=pe.edu.ulima.is2.viajes.servicio.CalculadoraPrecio -->
+        <pit.clases>pe.edu.ulima.is2.viajes.*</pit.clases>
+        <pit.pruebas>pe.edu.ulima.is2.viajes.*</pit.pruebas>
+
+        <!-- Las pruebas que evidencian un defecto se marcan con @Tag("defecto") y se excluyen por defecto
+             (PIT necesita una suite en verde). Para ejecutarlas: mvn test -Dexcluir.grupos=ninguno -Dgroups=defecto -->
+        <excluir.grupos>defecto</excluir.grupos>
+
+        <!-- Lo completa JaCoCo (prepare-agent); se declara vacío para que surefire no falle si se omite -->
+        <argLine/>
+    </properties>
+
+    <dependencies>
+        <!-- Pruebas -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+            </plugin>
+
+            <!-- Expone la ruta del JAR de Mockito como propiedad para cargarlo como agente -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.2</version>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar} -Xshare:off -Dnet.bytebuddy.experimental=true</argLine>
+                    <excludedGroups>${excluir.grupos}</excludedGroups>
+                </configuration>
+            </plugin>
+
+            <!-- Cobertura de código: mvn test genera target/site/jacoco/index.html -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.14</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <configuration>
+                            <!-- No instrumentar las clases que Mockito genera en tiempo de ejecución ni las del JDK -->
+                            <excludes>
+                                <exclude>**/*$MockitoMock$*</exclude>
+                                <exclude>sun/**</exclude>
+                                <exclude>jdk/**</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Pruebas de mutación:
+                 mvn test-compile org.pitest:pitest-maven:mutationCoverage
+                 Reporte: target/pit-reports/index.html -->
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <version>1.25.5</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-junit5-plugin</artifactId>
+                        <version>1.2.3</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <targetClasses>
+                        <param>${pit.clases}</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>${pit.pruebas}</param>
+                    </targetTests>
+                    <excludedClasses>
+                        <param>pe.edu.ulima.is2.viajes.App</param>
+                        <param>pe.edu.ulima.is2.viajes.integracion.*</param>
+                    </excludedClasses>
+                    <excludedGroups>
+                        <value>defecto</value>
+                    </excludedGroups>
+                    <jvmArgs>
+                        <value>-Dnet.bytebuddy.experimental=true</value>
+                    </jvmArgs>
+                    <outputFormats>
+                        <param>HTML</param>
+                        <param>XML</param>
+                    </outputFormats>
+                    <timestampedReports>false</timestampedReports>
+                </configuration>
+            </plugin>
+
+            <!-- mvn -q compile exec:java ejecuta la aplicación de consola -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <mainClass>${main.class}</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
